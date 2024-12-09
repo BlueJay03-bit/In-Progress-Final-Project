@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fortnite</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+      background: black;
+      color: white;
+    }
+
+    canvas {
+      display: block;
+      margin: 0 auto;
+      border: 2px solid white;
+    }
+
+    #score {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      font-size: 20px;
+      font-weight: bold;
+    }
+
+    .Fortnitereturn {
+      text-align: center;
+      width: 100%;
+      position: absolute;
+      bottom: 20px;
+    }
+
+    .Fortnitereturn a {
+      color: white;
+      text-decoration: none;
+      font-size: 20px;
+    }
+  </style>
+  <link href="../css/customstyles.css">
+</head>
+<body>
+  <div id="score">Score: 0</div>
+  <canvas id="gameCanvas"></canvas>
+
+  <script>
+    // Your game logic here (unchanged)
+  </script>
+
+  <div class="Fortnitereturn">
+    <a href="../index.html">Return</a>
+  </div>
+</body>
+</html>
+
+<body>
+  <div id="score">Score: 0</div>
+  <canvas id="gameCanvas"></canvas>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+
+    canvas.width = window.innerWidth * 0.8;
+    canvas.height = window.innerHeight * 0.8;
+
+    const targets = [];
+    const explosions = [];
+    const projectiles = [];
+    const enemyBullets = [];
+    let score = 0;
+    let gameOver = false;
+
+    const tank = {
+      x: canvas.width / 2,
+      y: canvas.height - 50,
+      width: 20,
+      height: 40,
+      speed: 5,
+      dx: 0,
+      dy: 0,
+      direction: { x: 0, y: -1 }, // Default shooting direction
+      color: 'blue',
+    };
+
+    class Target {
+      constructor() {
+        this.x = Math.random() * (canvas.width - 50) + 25;
+        this.y = Math.random() * (canvas.height - 200) + 50;
+        this.width = 20;
+        this.height = 40;
+        this.color = 'red';
+        this.dx = Math.random() * 6 - 3;
+        this.dy = Math.random() * 6 - 3;
+        this.fireCooldown = Math.random() * 100 + 50;
+      }
+
+      draw() {
+        ctx.fillStyle = this.color;
+        ctx.fillRect(this.x, this.y, this.width, this.height);
+
+        // Head
+        ctx.beginPath();
+        ctx.arc(this.x + this.width / 2, this.y - this.height / 4, this.width / 3, 0, Math.PI * 2);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+        ctx.closePath();
+      }
+
+      move() {
+        this.x += this.dx;
+        this.y += this.dy;
+
+        // Bounce off walls
+        if (this.x < 0 || this.x > canvas.width - this.width) {
+          this.dx = -this.dx;
+        }
+        if (this.y < 0 || this.y > canvas.height - this.height) {
+          this.dy = -this.dy;
+        }
+
+        // Bounce off other people
+        for (let other of targets) {
+          if (other === this) continue;
+          if (
+            this.x < other.x + other.width &&
+            this.x + this.width > other.x &&
+            this.y < other.y + other.height &&
+            this.y + this.height > other.y
+          ) {
+            this.dx = -this.dx;
+            this.dy = -this.dy;
+          }
+        }
+
+        // Fire bullets
+        if (this.fireCooldown <= 0) {
+          const angle = Math.random() * Math.PI * 2;
+          enemyBullets.push(new Projectile(this.x + this.width / 2, this.y, angle, 8, 'yellow', this));
+          this.fireCooldown = Math.random() * 100 + 50;
+        } else {
+          this.fireCooldown--;
+        }
+      }
+    }
+
+    class Explosion {
+      constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.size = 30;
+        this.maxSize = 50;
+        this.alpha = 1;
+      }
+
+      draw() {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 165, 0, ${this.alpha})`;
+        ctx.fill();
+        ctx.closePath();
+      }
+
+      update() {
+        this.size += 2;
+        this.alpha -= 0.05;
+      }
+    }
+
+    class Projectile {
+      constructor(x, y, angle, speed, color, shooter) {
+        this.x = x;
+        this.y = y;
+        this.size = 5;
+        this.color = color;
+        this.speed = speed;
+        this.dx = Math.cos(angle) * this.speed;
+        this.dy = Math.sin(angle) * this.speed;
+        this.shooter = shooter; // Store the shooter
+      }
+
+      draw() {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+        ctx.closePath();
+      }
+
+      move() {
+        this.x += this.dx;
+        this.y += this.dy;
+      }
+    }
+
+    function spawnTargets(count) {
+      for (let i = 0; i < count; i++) {
+        targets.push(new Target());
+      }
+    }
+
+    function detectCollisions() {
+      // Tank projectiles hitting targets
+      for (let i = projectiles.length - 1; i >= 0; i--) {
+        const projectile = projectiles[i];
+        for (let j = targets.length - 1; j >= 0; j--) {
+          const target = targets[j];
+          if (
+            projectile.x > target.x &&
+            projectile.x < target.x + target.width &&
+            projectile.y > target.y &&
+            projectile.y < target.y + target.height
+          ) {
+            explosions.push(new Explosion(target.x + target.width / 2, target.y + target.height / 2));
+            targets.splice(j, 1);
+            projectiles.splice(i, 1);
+            score++;
+            document.getElementById('score').textContent = `Score: ${score}`;
+            break;
+          }
+        }
+      }
+
+      // Enemy bullets hitting the tank
+      for (let i = enemyBullets.length - 1; i >= 0; i--) {
+        const bullet = enemyBullets[i];
+        if (
+          bullet.x > tank.x &&
+          bullet.x < tank.x + tank.width &&
+          bullet.y > tank.y &&
+          bullet.y < tank.y + tank.height
+        ) {
+          gameOver = true;
+          explosions.push(new Explosion(tank.x + tank.width / 2, tank.y + tank.height / 2));
+          setTimeout(() => {
+            alert("Game Over! You were hit.");
+            window.location.reload();
+          }, 500);
+          return;
+        }
+      }
+
+      // Enemy bullets hitting other enemies (Fix)
+      for (let i = enemyBullets.length - 1; i >= 0; i--) {
+        const bullet = enemyBullets[i];
+        for (let j = targets.length - 1; j >= 0; j--) {
+          const target = targets[j];
+          if (
+            bullet.x > target.x &&
+            bullet.x < target.x + target.width &&
+            bullet.y > target.y &&
+            bullet.y < target.y + target.height
+          ) {
+            // Check that the bullet is not from the same target (shooter)
+            if (bullet.shooter !== target) {
+              explosions.push(new Explosion(target.x + target.width / 2, target.y + target.height / 2));
+              targets.splice(j, 1); // Remove the target hit
+              enemyBullets.splice(i, 1); // Remove the bullet
+              break; // Stop the loop once we handle this collision
+            }
+          }
+        }
+      }
+    }
+
+    function drawTank() {
+      ctx.fillStyle = tank.color;
+      ctx.fillRect(tank.x, tank.y, tank.width, tank.height);
+
+      // Head
+      ctx.beginPath();
+      ctx.arc(tank.x + tank.width / 2, tank.y - tank.height / 4, tank.width / 3, 0, Math.PI * 2);
+      ctx.fillStyle = tank.color;
+      ctx.fill();
+    }
+
+    function handleTankMovement() {
+      tank.x += tank.dx;
+      tank.y += tank.dy;
+
+      if (tank.x < 0) tank.x = 0;
+      if (tank.x > canvas.width - tank.width) tank.x = canvas.width - tank.width;
+      if (tank.y < 0) tank.y = 0;
+      if (tank.y > canvas.height - tank.height) tank.y = canvas.height - tank.height;
+
+      if (tank.dx !== 0 || tank.dy !== 0) {
+        tank.direction.x = tank.dx;
+        tank.direction.y = tank.dy;
+      }
+    }
+
+    function updateGame() {
+      if (gameOver) return;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      handleTankMovement();
+
+      for (let target of targets) {
+        target.move();
+        target.draw();
+      }
+
+      for (let projectile of projectiles) {
+        projectile.move();
+        projectile.draw();
+      }
+
+      for (let enemyBullet of enemyBullets) {
+        enemyBullet.move();
+        enemyBullet.draw();
+      }
+
+      for (let explosion of explosions) {
+        explosion.update();
+        explosion.draw();
+        if (explosion.alpha <= 0) {
+          explosions.splice(explosions.indexOf(explosion), 1);
+        }
+      }
+
+      detectCollisions();
+
+      drawTank();
+
+      // Victory condition: if no targets left
+      if (targets.length === 0) {
+        setTimeout(() => {
+          alert("Victory Royale!");
+          window.location.reload();
+        }, 500);
+        return;
+      }
+
+      requestAnimationFrame(updateGame);
+    }
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowLeft') tank.dx = -tank.speed;
+      if (event.key === 'ArrowRight') tank.dx = tank.speed;
+      if (event.key === 'ArrowUp') tank.dy = -tank.speed;
+      if (event.key === 'ArrowDown') tank.dy = tank.speed;
+      if (event.key === ' ') {
+        const angle = Math.atan2(tank.direction.y, tank.direction.x);
+        projectiles.push(new Projectile(
+          tank.x + tank.width / 2,
+          tank.y,
+          angle,
+          8,
+          'yellow',
+          tank // Assign shooter to the tank
+        ));
+      }
+    });
+
+    document.addEventListener('keyup', (event) => {
+      if (['ArrowLeft', 'ArrowRight'].includes(event.key)) tank.dx = 0;
+      if (['ArrowUp', 'ArrowDown'].includes(event.key)) tank.dy = 0;
+    });
+
+    spawnTargets(20);
+    updateGame();
+  </script>
+  <div class="Fortnitereturn"> 
+    <a href="../index.html">Return</a>
+  </div>
+</body>
+</html>

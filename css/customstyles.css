@@ -1,0 +1,18 @@
+.mystyle{
+ color:aquamarine !important;
+}
+
+.Fortnitereturn {
+    text-align: center !important; /* Center the text inside the div */ 
+
+    width: 100%; /* Ensure the div spans the full width */
+    position: absolute; /* Position it absolutely on the screen */
+    bottom: 20px; /* Move it near the bottom of the screen (adjust as needed) */
+  }
+  
+  .Fortnitereturn a {
+    color: white; /* Set the link color */
+    text-decoration: none; /* Remove the underline from the link */
+    font-size: 20px; /* Set a reasonable font size */
+  }
+  
